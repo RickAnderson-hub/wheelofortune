@@ -87,4 +87,4 @@ State is stored in localStorage under key wof.state (labels and rotation). Use w
 
 ## Notes
 - Spin is disabled while animating or when there are fewer than 2 labels.
-- Labels are sanitized to non-empty strings; up to
+- Labels are sanitized to non-empty strings; up to 64 entries.
