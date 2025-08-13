@@ -5,3 +5,4 @@ html, body { height: 100%; margin: 0; background: #121212; color: #eaeaea; font-
 button { background: #ffd233; color: #222; border: 0; padding: 10px 16px; border-radius: 8px; font-weight: 700; cursor: pointer; }
 button:disabled { opacity: 0.6; cursor: not-allowed; }
 .label { opacity: 0.85; }
+.labels-input { min-width: 280px; padding: 10px 12px; border-radius: 8px; border: 1px solid #333; background: #181818; color: #eee; }

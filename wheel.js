@@ -11,6 +11,8 @@
   // Buttons
   const spinBtn = document.getElementById('spinBtn');
   const resetBtn = document.getElementById('resetBtn');
+  const labelsInput = document.getElementById('labelsInput');
+  const applyLabelsBtn = document.getElementById('applyLabelsBtn');
 
   // State (persisted)
   const defaultLabels = Array.from({length: 12}, (_, i) => `S${i+1}`);
@@ -280,6 +282,20 @@
   window.addEventListener('beforeunload', saveState);
   spinBtn.addEventListener('click', spin);
   resetBtn.addEventListener('click', reset);
+  if (applyLabelsBtn) {
+    applyLabelsBtn.addEventListener('click', () => {
+      const raw = (labelsInput?.value || '').trim();
+      const arr = raw.length ? raw.split(',') : [];
+      setLabels(arr);
+    });
+    // Allow pressing Enter in the input to apply
+    labelsInput?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        applyLabelsBtn.click();
+      }
+    });
+  }
 
   draw();
 })();
