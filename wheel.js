@@ -161,6 +161,18 @@
     return a; // always forward
   }
 
+  function modTau(a){ return (a % TAU + TAU) % TAU; }
+
+  // Index of the wedge currently under the top pointer given rotation
+  function indexAtPointer(count, rot){
+    if (count <= 0) return -1;
+    const segAngle = TAU / count;
+    // Pointer at top has angle -TAU/4; with our segment definition a0 starts at -TAU/4,
+    // so shifting by +TAU/4 reduces to simply -rot (mod TAU).
+    const ang = modTau(-rot);
+    return Math.floor((ang + 1e-9) / segAngle) % count;
+  }
+
   function spin(){
     if (anim || labels.length === 0) return;
     const n = labels.length;
@@ -195,12 +207,14 @@
     } else {
       // settle
       rotation = anim.end;
-      winnerIndex = anim.targetIndex;
-      const label = labels[winnerIndex];
+      // Determine winner by what is under the pointer
+      const winIdx = indexAtPointer(labels.length, rotation);
+      winnerIndex = winIdx;
+      const label = labels[winIdx];
       document.getElementById('result').textContent = `Result: ${label}`;
       anim = null;
       // Remove the winning slice and keep rotation congruent
-      labels.splice(winnerIndex, 1);
+      if (winIdx >= 0) labels.splice(winIdx, 1);
       // Normalize rotation to [0, TAU)
       rotation = ((rotation % TAU) + TAU) % TAU;
       saveState();
