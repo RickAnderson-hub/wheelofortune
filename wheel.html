@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Canvas Wheel — Spin with Ticks</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  html, body { height: 100%; margin: 0; background: #121212; color: #eaeaea; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  .wrap { display: grid; place-items: center; height: 100%; gap: 16px; }
+  #c { background: #1a1a1a; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+  .controls { display: flex; gap: 12px; align-items: center; }
+  button { background: #ffd233; color: #222; border: 0; padding: 10px 16px; border-radius: 8px; font-weight: 700; cursor: pointer; }
+  button:disabled { opacity: 0.6; cursor: not-allowed; }
+  .label { opacity: 0.8; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <canvas id="c" width="600" height="680"></canvas>
+  <div class="controls">
+    <button id="spin">Spin</button>
+    <button id="spinTo">Spin to 5</button>
+    <span class="label" id="result">Result: —</span>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+
+  // Config
+  const cfg = {
+    cx: 300, cy: 340,
+    outerR: 240,
+    innerR: 50,
+    segments: 12,
+    colors: ['#ff4d4d','#29cc7a','#4d7dff','#ffd233'],
+    lights: 36,
+    lightR: 6,
+    lightOffset: 20,
+    pointer: { w: 24, h: 44, color: '#ffd233', stroke: '#7b6331' },
+    rim: { fill: '#caa96c', stroke: '#7b6331', width: 6, inset: 10 },
+    hub: { fill: '#e74c3c', stroke: '#a22619', width: 6, inset: 10 },
+    dividerStroke: '#ffffff',
+    dividerWidth: 2,
+    plaque: { w: 360, h: 64, r: 12, fill: '#ffd233', stroke: '#7b6331', width: 5, text: '#7b2e00' },
+    easingMs: 4200,           // main spin duration
+    extraTurnsMin: 3,         // extra full rotations
+    extraTurnsMax: 6,
+    overshootDeg: 10,         // small bounce past the target
+    overshootMs: 400,         // bounce back duration
+  };
+
+  // State
+  const state = {
+    rotation: 0,        // radians
+    anim: null,         // current animation info or null
+    winner: null,       // last winner index
+    highlight: false,
+    tickIndex: 0,       // for tick sound thresholds
+  };
+
+  // Lazy audio
+  let audio = null;
+  function initAudio() {
+    if (audio) return;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    audio = new AudioCtx();
+  }
+  function tickSound() {
+    if (!audio) return;
+    const o = audio.createOscillator();
+    const g = audio.createGain();
+    o.type = 'square';
+    o.frequency.value = 1200;
+    g.gain.value = 0.08;
+    o.connect(g).connect(audio.destination);
+    o.start();
+    // very short blip
+    setTimeout(() => { o.stop(); o.disconnect(); g.disconnect(); }, 35);
+  }
+
+  const TAU = Math.PI * 2;
+  const segAngle = TAU / cfg.segments;
+
+  // Easing
+  const easeOutQuint = t => 1 - Math.pow(1 - t, 5);
+  const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
+
+  // Normalize angle to [0, 2π)
+  const norm = a => {
+    a = a % TAU;
+    return a < 0 ? a + TAU : a;
+  };
+
+  function draw() {
+    const { cx, cy, outerR, innerR, lights, lightR, lightOffset, rim, hub, plaque, pointer } = cfg;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Wheel (rotated)
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(state.rotation);
+    ctx.translate(-cx, -cy);
+
+    // Rim
+    ctx.fillStyle = rim.fill; ctx.strokeStyle = rim.stroke; ctx.lineWidth = rim.width;
+    ctx.beginPath();
+    ctx.arc(cx, cy, outerR + (rim.inset || 0), 0, TAU);
+    ctx.fill(); ctx.stroke();
+
+    // Segments + labels
+    for (let i = 0; i < cfg.segments; i++) {
+      const a0 = -Math.PI/2 + i * segAngle;
+      const a1 = a0 + segAngle;
+
+      // segment
+      ctx.beginPath();
+      ctx.arc(cx, cy, outerR, a0, a1);
+      ctx.arc(cx, cy, innerR, a1, a0, true);
+      ctx.closePath();
+      const isWinner = state.highlight && state.winner === i;
+      ctx.fillStyle = isWinner ? brighten(cfg.colors[i % cfg.colors.length], 1.2) : cfg.colors[i % cfg.colors.length];
+      ctx.fill();
+
+      // divider stroke
+      ctx.strokeStyle = cfg.dividerStroke; ctx.lineWidth = cfg.dividerWidth;
+      ctx.stroke();
+
+      // label
+      const mid = (a0 + a1) / 2;
+      const rx = cx + (innerR + outerR) / 2 * Math.cos(mid);
+      const ry = cy + (innerR + outerR) / 2 * Math.sin(mid);
+      ctx.save();
+      ctx.translate(rx, ry);
+      ctx.rotate(mid);
+      ctx.fillStyle = '#111';
+      ctx.font = '18px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`S${i + 1}`, 0, 0);
+      ctx.restore();
+
+      // winner glow overlay
+      if (isWinner) {
+        ctx.save();
+        ctx.globalAlpha = 0.2;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(cx, cy, outerR, a0, a1);
+        ctx.arc(cx, cy, innerR, a1, a0, true);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    // Light bulbs (on rim)
+    const lightRadius = outerR + lightOffset;
+    for (let i = 0; i < lights; i++) {
+      const a = -Math.PI/2 + (i / lights) * TAU;
+      const x = cx + lightRadius * Math.cos(a);
+      const y = cy + lightRadius * Math.sin(a);
+      ctx.beginPath();
+      ctx.arc(x, y, lightR, 0, TAU);
+      ctx.fillStyle = '#ffd233'; ctx.fill();
+      ctx.strokeStyle = '#d19b00'; ctx.lineWidth = 2; ctx.stroke();
+
+      // halo
+      ctx.save();
+      ctx.globalAlpha = 0.08;
+      ctx.beginPath();
+      ctx.arc(x, y, lightR * 3, 0, TAU);
+      ctx.fillStyle = '#ffd233';
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Hub
+    ctx.beginPath();
+    ctx.arc(cx, cy, innerR - (hub.inset || 0), 0, TAU);
+    ctx.fillStyle = hub.fill; ctx.fill();
+    ctx.strokeStyle = hub.stroke; ctx.lineWidth = hub.width; ctx.stroke();
+
+    ctx.restore();
+
+    // Pointer (fixed, not rotated)
+    ctx.beginPath();
+    const tipX = cfg.cx, tipY = cfg.cy - cfg.outerR - 4;
+    ctx.moveTo(tipX - pointer.w/2, tipY - pointer.h);
+    ctx.lineTo(tipX + pointer.w/2, tipY - pointer.h);
+    ctx.lineTo(tipX, tipY);
+    ctx.closePath();
+    ctx.fillStyle = pointer.color; ctx.fill();
+    ctx.strokeStyle = pointer.stroke; ctx.lineWidth = 4; ctx.stroke();
+
+    // Plaque
+    const px = cx - plaque.w/2, py = cy + cfg.outerR + 26;
+    rrect(px, py, plaque.w, plaque.h, plaque.r);
+    ctx.fillStyle = plaque.fill; ctx.fill();
+    ctx.strokeStyle = plaque.stroke; ctx.lineWidth = plaque.width; ctx.stroke();
+    ctx.fillStyle = plaque.text; ctx.font = 'bold 24px system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(state.winner == null ? 'WHEEL OF FORTUNE' : `WIN: S${state.winner + 1}`, cx, py + plaque.h/2);
+  }
+
+  function rrect(x,y,w,h,r) {
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.arcTo(x+w, y, x+w, y+h, r);
+    ctx.arcTo(x+w, y+h, x, y+h, r);
+    ctx.arcTo(x, y+h, x, y, r);
+    ctx.arcTo(x, y, x+w, y, r);
+    ctx.closePath();
+  }
+
+  function brighten(hex, factor) {
+    const c = parseInt(hex.slice(1), 16);
+    let r = Math.min(255, Math.round(((c >> 16) & 0xff) * factor));
+    let g = Math.min(255, Math.round(((c >> 8) & 0xff) * factor));
+    let b = Math.min(255, Math.round((c & 0xff) * factor));
+    return `rgb(${r},${g},${b})`;
+  }
+
+  // Animation runner with two stages (main spin + tiny overshoot back)
+  function spinToIndex(winnerIndex) {
+    if (state.anim) return;
+    const btns = document.querySelectorAll('button'); btns.forEach(b => b.disabled = true);
+
+    // Pick a target rotation that lands winner under the pointer at -π/2
+    const centerAngle = -Math.PI/2 + (winnerIndex + 0.5) * segAngle; // wheel-local
+    const desiredMod = -centerAngle; // rotation so that center + rotation = -π/2
+    const extraTurns = cfg.extraTurnsMin + Math.random() * (cfg.extraTurnsMax - cfg.extraTurnsMin);
+    const baseEnd = state.rotation + extraTurns * TAU;
+    const delta = norm(desiredMod - baseEnd); // forward to the next congruent
+    const endRotation = baseEnd + delta;
+
+    // Stage 1: ease to endRotation
+    const t0 = performance.now();
+    const d1 = cfg.easingMs;
+    const start = state.rotation;
+
+    // Setup tick index based on start
+    state.tickIndex = Math.floor(start / segAngle);
+
+    state.winner = null;
+    state.highlight = false;
+
+    state.anim = { phase: 1, endRotation };
+
+    function frame(now) {
+      if (!state.anim) return;
+      if (state.anim.phase === 1) {
+        const t = Math.min(1, (now - t0) / d1);
+        const k = easeOutQuint(t);
+        const rot = start + (endRotation - start) * k;
+
+        // ticks
+        const idx = Math.floor(rot / segAngle);
+        while (idx > state.tickIndex) {
+          state.tickIndex++;
+          tickSound();
+        }
+
+        state.rotation = rot;
+        draw();
+
+        if (t < 1) {
+          requestAnimationFrame(frame);
+        } else {
+          // Stage 2: overshoot back a hair
+          const overshoot = cfg.overshootDeg * Math.PI / 180;
+          const overEnd = endRotation + overshoot;
+          const overStart = state.rotation;
+          const t1 = performance.now();
+          const d2 = cfg.overshootMs;
+
+          state.anim = { phase: 2, overEnd, overStart, t1, d2 };
+          requestAnimationFrame(frame);
+        }
+      } else if (state.anim.phase === 2) {
+        const { overEnd, overStart, t1, d2 } = state.anim;
+        const t = Math.min(1, (now - t1) / d2);
+        const k = easeOutCubic(t);
+        state.rotation = overStart + (overEnd - overStart) * k;
+        draw();
+
+        if (t < 1) {
+          requestAnimationFrame(frame);
+        } else {
+          // settle back exactly on endRotation
+          state.rotation = state.anim.overEnd;
+          // Set winner and highlight
+          state.winner = winnerIndex;
+          state.highlight = true;
+          state.anim = null;
+          draw();
+          document.getElementById('result').textContent = `Result: S${winnerIndex + 1}`;
+          const btns = document.querySelectorAll('button'); btns.forEach(b => b.disabled = false);
+        }
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // Initial draw
+  draw();
+
+  // Controls
+  document.getElementById('spin').addEventListener('click', () => {
+    initAudio();
+    const winner = Math.floor(Math.random() * cfg.segments);
+    spinToIndex(winner);
+  });
+
+  document.getElementById('spinTo').addEventListener('click', () => {
+    initAudio();
+    // Example: spin to segment 5 (0-based)
+    spinToIndex(5);
+  });
+})();
+</script>
+</body>
+</html>

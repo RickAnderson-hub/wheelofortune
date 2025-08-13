@@ -1,3 +1,4 @@
+// No JS needed: CSS scales wheel to fit the page.
 (function() {
   const wrap = document.getElementById('handleWrap');
   if (!wrap) return;

@@ -16,15 +16,10 @@ body {
   padding: 1rem;
   flex-wrap: wrap;
 }
-.handle-wrap {
-  position: relative;
-  display: grid; /* overlay children */
-  cursor: pointer;
-}
 /* Wheel/notice images */
 .photo {
-  max-width: 45vw;
-  max-height: 80vh;
+  max-width: 95vw;
+  max-height: 95vh;
   height: auto;
   width: auto;
   display: block;
@@ -35,21 +30,20 @@ body {
   .photo { max-width: 90vw; }
 }
 
-/* Handle image styling */
-.handle-img {
-  max-height: 80vh;
+
+/* Embedded wheel frame styling */
+.frame-wrap {
+  position: relative;
+  overflow: hidden;
+  /* Preserve the wheel.html SVG aspect ratio (560x620) and scale to viewport */
+  aspect-ratio: 560 / 620;
+  width: min(95vw, calc(95vh * (560 / 620)));
   height: auto;
-  width: auto;
-  display: block;
-  border-radius: 8px;
-  box-shadow: 0 2px 16px rgba(0,0,0,.15);
-  cursor: pointer;
-  user-select: none;
-  grid-area: 1 / 1; /* overlay both images */
-  transition: opacity 180ms ease;
 }
-.handle-img:focus-visible { outline: 3px solid Highlight; outline-offset: 2px; }
-.handle-up { opacity: 1; }
-.handle-down { opacity: 0; }
-.handle-wrap.down .handle-up { opacity: 0; }
-.handle-wrap.down .handle-down { opacity: 1; }
+.frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+  border-radius: inherit;
+}

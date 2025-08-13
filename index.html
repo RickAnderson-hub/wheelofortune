@@ -7,14 +7,12 @@
   <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="wrap" role="group" aria-label="Notice, wheel and handle">
-      <img class="photo" src="notice.png" alt="Notice" />
-      <img id="wheel" class="photo" src="wheel.png" alt="Wheel" />
-      <div id="handleWrap" class="handle-wrap" aria-label="Handle">
-        <img id="handleUp" class="handle-img handle-up" src="handle_up.png" alt="Handle up" />
-        <img id="handleDown" class="handle-img handle-down" src="handle_down.png" alt="" aria-hidden="true" />
+    <div class="wrap" role="group" aria-label="Wheel">
+      <div id="wheelEmbed" class="photo frame-wrap" aria-label="Wheel">
+        <iframe class="frame" src="wheel.html" title="Wheel of Fortune" loading="lazy"></iframe>
       </div>
     </div>
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="script.js"></script>
   </body>
   
