@@ -55,5 +55,5 @@ frame.contentWindow.postMessage({ type: 'getState' }, '*');
 State is stored in localStorage under key wof.state (labels and rotation). Use wheelAPI.clearState() to clear it.
 
 ## Notes
-- Spin is disabled while animating or when there are no labels.
+- Spin is disabled while animating or when there are fewer than 2 labels.
 - Labels are sanitized to non-empty strings; up to 64 entries.

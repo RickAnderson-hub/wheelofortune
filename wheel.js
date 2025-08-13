@@ -87,7 +87,8 @@
   })();
 
   function updateControls(){
-    spinBtn.disabled = !!anim || labels.length === 0;
+    // Disable while animating or when fewer than 2 labels remain
+    spinBtn.disabled = !!anim || labels.length <= 1;
   }
 
   function draw(){
