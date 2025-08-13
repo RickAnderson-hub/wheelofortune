@@ -179,17 +179,19 @@
   function spin(){
     if (anim || labels.length === 0) return;
     const n = labels.length;
-    const segAngle = TAU / n;
-    // random winner among remaining labels
-    const targetIndex = Math.floor(Math.random() * n);
-    const centerAngle = -TAU/4 + (targetIndex + 0.5) * segAngle; // wheel-local
-    const desiredMod = -centerAngle; // rotation so mid sits under pointer
-    const extraTurns = 4 + Math.random()*2; // 4..6 turns
-    const baseEnd = rotation + extraTurns * TAU;
+  const segAngle = TAU / n;
+  // random winner among remaining labels
+  const targetIndex = Math.floor(Math.random() * n);
+  const centerAngle = -TAU/4 + (targetIndex + 0.5) * segAngle; // wheel-local
+  const desiredMod = -centerAngle; // rotation so mid sits under pointer
+  // Add more variance to spin length (turns and duration)
+  const extraTurns = 3 + Math.random()*7; // 3..10 turns
+  const baseEnd = rotation + extraTurns * TAU;
     const delta = normalize(desiredMod - baseEnd);
     const end = baseEnd + delta;
 
-    const d = 4200; // ms
+  // Duration scales with turns plus random jitter
+  const d = Math.round(2400 + extraTurns * 600 + Math.random()*2200); // ~2.4s .. 9.2s
     const t0 = performance.now();
     const start = rotation;
     winnerIndex = null;
