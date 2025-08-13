@@ -19,6 +19,40 @@
   let anim = null;       // { t0, d, start, end }
   let winnerIndex = null;
 
+  function sanitizeLabels(arr){
+    if (!Array.isArray(arr)) return null;
+    const out = [];
+    for (const v of arr) {
+      if (typeof v !== 'string') continue;
+      const t = v.trim();
+      if (t.length === 0) continue;
+      out.push(t);
+      if (out.length >= 64) break;
+    }
+    return out;
+  }
+
+  function parseQueryLabels(){
+    try {
+      const params = new URLSearchParams(location.search);
+      if (!params.has('labels') && !params.has('reset')) return null;
+      if (params.has('labels')) {
+        const raw = params.get('labels');
+        let arr;
+        // Support JSON array or comma-separated
+        if (raw && raw.trim().startsWith('[')) {
+          arr = JSON.parse(raw);
+        } else {
+          arr = (raw || '').split(',');
+        }
+        const cleaned = sanitizeLabels(arr);
+        return { labels: cleaned ?? [] , rotation: 0 };
+      }
+      // reset present without labels => force defaults
+      return { labels: defaultLabels.slice(), rotation: 0 };
+    } catch { return null; }
+  }
+
   function loadState(){
     try {
       const raw = localStorage.getItem('wof.state');
@@ -35,8 +69,16 @@
     try { localStorage.setItem('wof.state', JSON.stringify({ labels, rotation })); } catch {}
   }
 
-  // Initialize from storage or defaults
-  (function initFromStorage(){
+  // Initialize from query, then storage, then defaults
+  (function initState(){
+    const fromQuery = parseQueryLabels();
+    if (fromQuery) {
+      labels = fromQuery.labels;
+      rotation = fromQuery.rotation;
+      // If query provided labels but empty, allow empty and disable spin
+      saveState();
+      return;
+    }
     const restored = loadState();
     labels = restored ? restored.labels : defaultLabels.slice();
     rotation = restored ? restored.rotation : 0;
@@ -174,6 +216,52 @@
     saveState();
     draw();
   }
+
+  function setLabels(newLabels){
+    if (anim) return false;
+    const cleaned = sanitizeLabels(newLabels);
+    if (!cleaned) return false;
+    labels = cleaned;
+    winnerIndex = null;
+    // keep current rotation so wheel orientation feels continuous
+    saveState();
+    draw();
+    return true;
+  }
+
+  // Simple API surface and postMessage bridge
+  window.wheelAPI = {
+    setLabels,
+    getLabels: () => labels.slice(),
+    reset,
+    spin,
+    getRotation: () => rotation,
+    setRotation: (r) => { if (!anim && typeof r === 'number' && isFinite(r)) { rotation = r; saveState(); draw(); return true; } return false; },
+    clearState: () => { try { localStorage.removeItem('wof.state'); } catch {} }
+  };
+
+  window.addEventListener('message', (e) => {
+    const d = e.data;
+    if (!d || typeof d !== 'object') return;
+    let reply = null;
+    switch (d.type) {
+      case 'setLabels':
+        reply = { ok: setLabels(d.labels) };
+        break;
+      case 'reset':
+        if (!anim) { reset(); reply = { ok: true }; } else reply = { ok: false };
+        break;
+      case 'spin':
+        if (!anim) { spin(); reply = { ok: true }; } else reply = { ok: false };
+        break;
+      case 'getState':
+        reply = { labels: labels.slice(), rotation };
+        break;
+      default:
+        return;
+    }
+    try { e.source && e.source.postMessage({ type: d.type + 'Result', ...reply }, '*'); } catch {}
+  });
 
   window.addEventListener('beforeunload', saveState);
   spinBtn.addEventListener('click', spin);
