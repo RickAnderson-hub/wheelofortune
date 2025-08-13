@@ -1,0 +1,7 @@
+html, body { height: 100%; margin: 0; background: #121212; color: #eaeaea; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+.wrap { display: grid; place-items: center; height: 100%; gap: 16px; }
+#c { background: #1a1a1a; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+.controls { display: flex; gap: 12px; align-items: center; }
+button { background: #ffd233; color: #222; border: 0; padding: 10px 16px; border-radius: 8px; font-weight: 700; cursor: pointer; }
+button:disabled { opacity: 0.6; cursor: not-allowed; }
+.label { opacity: 0.85; }
