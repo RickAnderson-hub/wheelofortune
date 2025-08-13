@@ -35,12 +35,45 @@
       const innerR = 40;
       const colors = ['#ff4d4d','#29cc7a','#4d7dff','#ffd233'];
 
-      let labels = Array.from({length: 12}, (_, i) => `S${i+1}`);
-      let rotation = 0; // radians
-      let anim = null; // { t0, d, start, end }
+      // Buttons
+      const spinBtn = document.getElementById('spinBtn');
+      const resetBtn = document.getElementById('resetBtn');
+
+      // State (persisted)
+      const defaultLabels = Array.from({length: 12}, (_, i) => `S${i+1}`);
+      let labels;            // array of strings
+      let rotation;          // radians
+      let anim = null;       // { t0, d, start, end }
       let winnerIndex = null;
 
+      function loadState(){
+        try {
+          const raw = localStorage.getItem('wof.state');
+          if (!raw) return null;
+          const obj = JSON.parse(raw);
+          const arr = Array.isArray(obj.labels) ? obj.labels.filter(v => typeof v === 'string').slice(0, 64) : null;
+          const rot = typeof obj.rotation === 'number' && isFinite(obj.rotation) ? obj.rotation : 0;
+          if (!arr || arr.length === 0) return null;
+          return { labels: arr, rotation: rot };
+        } catch { return null; }
+      }
+
+      function saveState(){
+        try { localStorage.setItem('wof.state', JSON.stringify({ labels, rotation })); } catch {}
+      }
+
+      // Initialize from storage or defaults
+      (function initFromStorage(){
+        const restored = loadState();
+        labels = restored ? restored.labels : defaultLabels.slice();
+        rotation = restored ? restored.rotation : 0;
+      })();
+
       function easeOutQuint(t){ return 1 - Math.pow(1-t, 5); }
+
+      function updateControls(){
+        spinBtn.disabled = !!anim || labels.length === 0;
+      }
 
       function draw(){
         ctx.clearRect(0,0,W,H);
@@ -105,9 +138,10 @@
         // Plaque text
         const resEl = document.getElementById('result');
         if (winnerIndex == null) resEl.textContent = 'Result: —';
+  updateControls();
       }
 
-      function spin(){
+  function spin(){
         if (anim || labels.length === 0) return;
         const n = labels.length;
         const segAngle = TAU / n;
@@ -126,7 +160,8 @@
         winnerIndex = null;
         anim = { t0, d, start, end, targetIndex };
 
-        requestAnimationFrame(step);
+  updateControls();
+  requestAnimationFrame(step);
       }
 
       function step(now){
@@ -148,6 +183,7 @@
           labels.splice(winnerIndex, 1);
           // Normalize rotation to [0, TAU)
           rotation = ((rotation % TAU) + TAU) % TAU;
+          saveState();
           draw();
         }
       }
@@ -162,11 +198,13 @@
         rotation = 0;
         winnerIndex = null;
         anim = null;
+        saveState();
         draw();
       }
 
-      document.getElementById('spinBtn').addEventListener('click', spin);
-      document.getElementById('resetBtn').addEventListener('click', reset);
+      window.addEventListener('beforeunload', saveState);
+      spinBtn.addEventListener('click', spin);
+      resetBtn.addEventListener('click', reset);
 
       draw();
     })();
